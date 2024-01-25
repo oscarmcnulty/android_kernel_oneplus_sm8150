@@ -914,10 +914,18 @@ static int pd_eval_src_caps(struct usbpd *pd)
 			POWER_SUPPLY_PROP_PD_ACTIVE, &val);
 
 #ifdef VENDOR_EDIT
+	// TODO: how can this be triggered?
+	usbpd_dbg(&pd->dev, "pd->peer_usb_comm= %d\n", pd->peer_usb_comm);
+	usbpd_dbg(&pd->dev, "pd->peer_pr_swap= %d\n", pd->peer_pr_swap);
+	usbpd_dbg(&pd->dev, "pd->peer_dr_swap= %d\n", pd->peer_dr_swap);
+	usbpd_dbg(&pd->dev, "pd->current_dr= %d\n", pd->current_dr);
+	usbpd_dbg(&pd->dev, "pd->pd_connected= %d\n", pd->pd_connected);
 	if (pd->peer_usb_comm && pd->current_dr == DR_UFP && !pd->pd_connected) {
 			printk("set opluschg_pd_sdp = true\n");
 			oplus_set_opluschg_pd_sdp(true);
 	}
+	// try hardcoding this to true
+	oplus_set_opluschg_pd_sdp(true);
 #endif
 
 	/* First time connecting to a PD source and it supports USB data */
@@ -1641,6 +1649,7 @@ static void usbpd_set_state(struct usbpd *pd, enum usbpd_state next_state)
 
 	/* Sink states */
 	case PE_SNK_STARTUP:
+		usbpd_dbg(&pd->dev, "PE_SNK_STARTUP, pd->current_dr= %d\n", pd->current_dr);
 		if (pd->current_dr == DR_NONE || pd->current_dr == DR_UFP) {
 			pd->current_dr = DR_UFP;
 

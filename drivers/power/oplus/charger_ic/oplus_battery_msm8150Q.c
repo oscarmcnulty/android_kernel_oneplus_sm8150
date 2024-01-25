@@ -309,17 +309,17 @@ void __attribute__((weak)) switch_usb_state(int usb_state) {return;}
 	pr_err("%s: %s: " fmt, chg->name,	\
 		__func__, ##__VA_ARGS__)	\
 
-#ifdef OPLUS_FEATURE_CHG_BASIC
-#define smblib_dbg(chg, reason, fmt, ...)			\
-	while(0){							\
-		if (*chg->debug_mask & (reason))		\
-			pr_err("%s: %s: " fmt, chg->name,	\
-				__func__, ##__VA_ARGS__);	\
-		else						\
-			pr_err("%s: %s: " fmt, chg->name,	\
-				__func__, ##__VA_ARGS__);	\
-	} //while (0)
-#else
+//#ifdef OPLUS_FEATURE_CHG_BASIC
+//#define smblib_dbg(chg, reason, fmt, ...)			\
+//	while(0){							\
+//		if (*chg->debug_mask & (reason))		\
+//			pr_err("%s: %s: " fmt, chg->name,	\
+//				__func__, ##__VA_ARGS__);	\
+//		else						\
+//			pr_err("%s: %s: " fmt, chg->name,	\
+//				__func__, ##__VA_ARGS__);	\
+//	} //while (0)
+//#else
 #define smblib_dbg(chg, reason, fmt, ...)			\
 	do {							\
 		if (*chg->debug_mask & (reason))		\
@@ -329,7 +329,7 @@ void __attribute__((weak)) switch_usb_state(int usb_state) {return;}
 			pr_debug("%s: %s: " fmt, chg->name,	\
 				__func__, ##__VA_ARGS__);	\
 	} while (0)
-#endif
+//#endif
 
 #define typec_rp_med_high(chg, typec_mode)			\
 	((typec_mode == POWER_SUPPLY_TYPEC_SOURCE_MEDIUM	\
@@ -931,6 +931,8 @@ static const struct apsd_result *smblib_get_apsd_result(struct smb_charger *chg)
 		return result;
 	}
 	stat &= APSD_RESULT_STATUS_MASK;
+	smblib_dbg(chg, PR_REGISTER, "APSD_RESULT_STATUS = 0x%02x\n", stat);
+	stat = CDP_CHARGER_BIT; // force detect CDP
 
 	for (i = 0; i < ARRAY_SIZE(smblib_apsd_results); i++) {
 		if (smblib_apsd_results[i].bit == stat)
@@ -1513,13 +1515,24 @@ int opchg_get_charger_type(void)
 		chg_debug("update_usb_type: get_charger_type=%d\n", chg->real_charger_type);
 	}
 
-
+	chg_debug("get_charger_type: chg->real_charger_type=%d\n", chg->real_charger_type);
+	chg_debug("get_charger_type: apsd_result->name=%s\n", apsd_result->name);
+	chg_debug("get_charger_type: opluschg_pd_sdp=%d\n", opluschg_pd_sdp);
 	if (POWER_SUPPLY_TYPE_USB_PD == chg->real_charger_type) {
 		if (strcmp("SDP", apsd_result->name) == 0 || opluschg_pd_sdp == true) {
 			type = POWER_SUPPLY_TYPE_USB;
 		} else {
-			type = POWER_SUPPLY_TYPE_USB_DCP;
+			// TODO: get adsp to detect sdp so above if can be used.
+			// Trying to apply same charger type as oplus_set_opluschg_pd_sdp
+			//type = POWER_SUPPLY_TYPE_USB_DCP;
+			type = POWER_SUPPLY_TYPE_USB;
 		}
+		goto get_type_done;
+	}
+
+	// panda can supply at least 5V/2A so hardcode to higher amp usb charger type
+	if (POWER_SUPPLY_TYPE_USB == chg->real_charger_type) {
+		type = POWER_SUPPLY_TYPE_USB_CDP;
 		goto get_type_done;
 	}
 
@@ -4137,12 +4150,15 @@ int smblib_get_prop_typec_power_role(struct smb_charger *chg,
 	switch (ctrl & (EN_SRC_ONLY_BIT | EN_SNK_ONLY_BIT)) {
 	case 0:
 		val->intval = POWER_SUPPLY_TYPEC_PR_DUAL;
+		smblib_dbg(chg, PR_REGISTER, "smblib_get_prop_typec_power_role: POWER_SUPPLY_TYPEC_PR_DUAL\n",ctrl);
 		break;
 	case EN_SRC_ONLY_BIT:
 		val->intval = POWER_SUPPLY_TYPEC_PR_SOURCE;
+		smblib_dbg(chg, PR_REGISTER, "smblib_get_prop_typec_power_role: POWER_SUPPLY_TYPEC_PR_SOURCE\n",ctrl);
 		break;
 	case EN_SNK_ONLY_BIT:
 		val->intval = POWER_SUPPLY_TYPEC_PR_SINK;
+		smblib_dbg(chg, PR_REGISTER, "smblib_get_prop_typec_power_role: POWER_SUPPLY_TYPEC_PR_SINK\n",ctrl);
 		break;
 	default:
 		val->intval = POWER_SUPPLY_TYPEC_PR_NONE;
@@ -10952,6 +10968,7 @@ static int smb5_usb_set_prop(struct power_supply *psy,
 		rc = smblib_set_prop_pd_voltage_min(chg, val);
 		break;
 	case POWER_SUPPLY_PROP_SDP_CURRENT_MAX:
+		smblib_dbg(chg, PR_INTERRUPT, "smblib_set_prop_sdp_current_max=%d\n",val->intval);
 		rc = smblib_set_prop_sdp_current_max(chg, val);
 		break;
 	case POWER_SUPPLY_PROP_CONNECTOR_HEALTH:
@@ -11273,6 +11290,7 @@ static int smb5_usb_main_set_prop(struct power_supply *psy,
 		rc = smblib_set_charge_param(chg, &chg->param.fcc, val->intval);
 		break;
 	case POWER_SUPPLY_PROP_CURRENT_MAX:
+		smblib_dbg(chg, PR_INTERRUPT, "smblib_set_icl_current=%d\n",val->intval);
 		rc = smblib_set_icl_current(chg, val->intval);
 		break;
 	case POWER_SUPPLY_PROP_FLASH_ACTIVE:
@@ -13995,6 +14013,7 @@ static int usb_icl[] = {
 #define USBIN_25MA	25000
 static int oplus_chg_set_input_current(int current_ma)
 {
+	chg_debug( "oplus_chg_set_input_current: %dma\n", current_ma);
 	int rc = 0, i = 0;
 	int chg_vol = 0;
 	int aicl_point = 0;

@@ -7128,12 +7128,15 @@ static void oplus_chg_print_log(struct oplus_chg_chip *chip)
 		charger_xlog_printk(CHG_LOG_CRTI,
 			" CHGR[ %d / %d / %d / %d / %d ], "
 			"BAT[ %d / %d / %d / %d / %d / %d ], "
-			"GAUGE[ %d / %d / %d / %d / %d / %d / %d / %d / %d / %d / %d / %d / %d / %d / %d / %d / %d / %d / %d / %d / %d / %d /], "
+			"GAUGE[ %d / %d / %d / chg:%dmA / %d / %d / %d / %d / %d / %d / %d / %d / %d / %d / %d / %d / %d / %d / %d / %d / %d / %d /], "
 			"STATUS[ 0x%x / %d / %d / %d / %d / 0x%x ], OTHER[ %d / %d / %d / %d / %d/ %d ]\n",
+			//CHGR
 			chip->charger_exist, chip->charger_type, chip->charger_volt,
 			chip->prop_status, chip->boot_mode,
+			//BAT
 			chip->batt_exist, chip->batt_full, chip->chging_on, chip->in_rechging,
 			chip->charging_state, chip->total_time,
+			//GAUGE
 			chip->temperature, chip->batt_volt, chip->batt_volt_min, chip->icharging,
 			chip->ibus, chip->soc, chip->ui_soc, chip->soc_load, chip->batt_rm,
 			oplus_gauge_get_batt_fc(),oplus_gauge_get_batt_qm(),
